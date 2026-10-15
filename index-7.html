@@ -1,0 +1,161 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Expense Tracker</title>
+<style>
+:root{--bg:#f6f7f9;--card:#fff;--tx:#1b1f27;--mu:#6b7280;--bd:#e5e7eb;--ac:#4f46e5;--ok:#16a34a;--bad:#dc2626;color-scheme:light;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#0f1115;--card:#1a1d24;--tx:#eceef2;--mu:#9aa1ad;--bd:#2a2e38;--ac:#818cf8;--ok:#4ade80;--bad:#f87171;color-scheme:dark}}
+:root[data-theme="dark"]{--bg:#0f1115;--card:#1a1d24;--tx:#eceef2;--mu:#9aa1ad;--bd:#2a2e38;--ac:#818cf8;--ok:#4ade80;--bad:#f87171;color-scheme:dark}
+html{scroll-padding-top:env(safe-area-inset-top,0px)}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--tx);font:15px/1.45 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
+main{max-width:720px;margin:0 auto;padding:16px}
+h1{font-size:22px;margin:4px 0 2px}h2{font-size:15px;margin:0 0 10px}
+.sub{color:var(--mu);font-size:13px;margin-bottom:14px}
+.card{background:var(--card);border:1px solid var(--bd);border-radius:14px;padding:14px;margin-bottom:14px}
+.grid{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}
+.stat .l{color:var(--mu);font-size:12px}.stat .v{font-size:19px;font-weight:700}
+.bar{height:10px;background:var(--bd);border-radius:6px;overflow:hidden;margin:8px 0 4px}
+.bar i{display:block;height:100%;background:var(--ok);border-radius:6px}
+form{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+input,select,button{font:inherit;padding:10px;border-radius:10px;border:1px solid var(--bd);background:var(--bg);color:var(--tx);min-width:0;width:100%}
+.full{grid-column:1/-1}
+button{background:var(--ac);color:#fff;border:0;font-weight:600;cursor:pointer}
+button.g{background:transparent;color:var(--mu);border:1px solid var(--bd);width:auto;padding:6px 10px;font-size:13px}
+.ins{display:flex;gap:10px;padding:9px 0;border-top:1px solid var(--bd)}.ins:first-of-type{border-top:0}
+.ins b{font-weight:600}.ic{font-size:18px}
+.row{display:flex;align-items:center;gap:10px;padding:9px 0;border-top:1px solid var(--bd)}
+.row:first-child{border-top:0}.dot{width:10px;height:10px;border-radius:50%;flex:none}
+.grow{flex:1;min-width:0}.nm{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.dt{color:var(--mu);font-size:12px}
+.x{background:none;color:var(--mu);width:auto;padding:4px 8px;font-size:18px}
+.legend{display:flex;flex-wrap:wrap;gap:6px 12px;font-size:12px;color:var(--mu);margin-top:8px}
+.legend span{display:flex;align-items:center;gap:5px}
+.ch{display:flex;align-items:center;gap:14px;flex-wrap:wrap}
+.top{display:flex;justify-content:space-between;align-items:center;gap:8px}
+.empty{color:var(--mu);text-align:center;padding:14px}
+</style></head><body><main>
+<div class="top"><div><h1>💸 Expense Tracker</h1><div class="sub" id="month"></div></div>
+<button class="g" id="demo">Load demo data</button></div>
+
+<div class="card">
+<div class="grid">
+<div class="stat"><div class="l">Spent</div><div class="v" id="spent">–</div></div>
+<div class="stat"><div class="l">Budget</div><div class="v"><input id="budget" type="number" min="0" style="padding:2px 6px;font-size:17px;font-weight:700"></div></div>
+<div class="stat"><div class="l">Left</div><div class="v" id="left">–</div></div>
+</div>
+<div class="bar"><i id="pb"></i></div><div class="dt" id="pt"></div>
+</div>
+
+<div class="card"><h2>Add expense</h2>
+<form id="f">
+<input id="amt" type="number" step="0.01" min="0.01" placeholder="Amount" required>
+<select id="cat"></select>
+<input id="note" class="full" placeholder="Note (e.g. Lunch at Joe's)" maxlength="60">
+<input id="date" type="date" required><button>Add</button>
+</form></div>
+
+<div class="card"><h2>✨ Smart insights</h2><div id="ins"></div></div>
+
+<div class="card"><h2>Spending by category</h2><div class="ch"><div id="donut"></div><div class="legend" id="leg" style="flex:1;flex-direction:column"></div></div></div>
+<div class="card"><h2>Last 6 months</h2><div id="bars"></div></div>
+
+<div class="card"><div class="top"><h2>Recent expenses</h2><button class="g" id="clr">Clear all</button></div><div id="list"></div></div>
+</main>
+<script>
+const CATS={Food:"#f59e0b",Transport:"#3b82f6",Housing:"#8b5cf6",Shopping:"#ec4899",Bills:"#14b8a6",Health:"#ef4444",Fun:"#22c55e",Other:"#94a3b8"};
+const $=id=>document.getElementById(id);
+let S={ex:[],budget:1000};
+try{const r=localStorage.getItem("expt");if(r)S=JSON.parse(r)}catch(e){}
+const save=()=>{try{localStorage.setItem("expt",JSON.stringify(S))}catch(e){}};
+const $$=n=>"$"+n.toLocaleString(undefined,{minimumFractionDigits:0,maximumFractionDigits:0});
+const $2=n=>"$"+n.toFixed(2);
+const esc=s=>String(s).replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+const iso=d=>d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0")+"-"+String(d.getDate()).padStart(2,"0");
+const now=new Date(),today=iso(now);
+const mk=(y,m)=>y+"-"+String(m+1).padStart(2,"0");
+const curM=mk(now.getFullYear(),now.getMonth());
+const prevD=new Date(now.getFullYear(),now.getMonth()-1,1),prevM=mk(prevD.getFullYear(),prevD.getMonth());
+const sum=a=>a.reduce((s,e)=>s+e.a,0);
+const inM=m=>S.ex.filter(e=>e.d.startsWith(m));
+$("cat").innerHTML=Object.keys(CATS).map(c=>`<option>${c}</option>`).join("");
+$("date").value=today;
+$("month").textContent=now.toLocaleString(undefined,{month:"long",year:"numeric"});
+
+function insights(){
+  const cur=inM(curM),prev=inM(prevM),out=[];
+  if(!cur.length)return [["👋","Add a few expenses and I'll start spotting patterns."]];
+  const day=now.getDate(),dim=new Date(now.getFullYear(),now.getMonth()+1,0).getDate();
+  const tot=sum(cur),proj=tot/day*dim;
+  out.push(["📈",`At this pace you'll spend about <b>${$$(proj)}</b> by month end (${$$(tot/day)}/day).`]);
+  if(S.budget>0){
+    if(tot>S.budget)out.push(["🚨",`You're <b>${$$(tot-S.budget)} over</b> your ${$$(S.budget)} budget.`]);
+    else if(proj>S.budget)out.push(["⚠️",`Projected to exceed budget by <b>${$$(proj-S.budget)}</b>. Try limiting to <b>${$$((S.budget-tot)/Math.max(1,dim-day))}/day</b> for the rest of the month.`]);
+    else out.push(["✅",`On track: ${$$(S.budget-tot)} left, about <b>${$$((S.budget-tot)/Math.max(1,dim-day))}/day</b> available.`]);
+  }
+  const bc={};cur.forEach(e=>bc[e.c]=(bc[e.c]||0)+e.a);
+  const t=Object.entries(bc).sort((a,b)=>b[1]-a[1])[0];
+  out.push(["🏆",`<b>${t[0]}</b> is your top category: ${$$(t[1])} (${Math.round(t[1]/tot*100)}% of spending).`]);
+  if(prev.length){
+    const bp={};prev.forEach(e=>bp[e.c]=(bp[e.c]||0)+e.a);
+    const pt=sum(prev),dayP=prev.filter(e=>+e.d.slice(8)<=day);const same=sum(dayP);
+    if(same>0){const p=Math.round((tot-same)/same*100);out.push([p>0?"🔺":"🔻",`Spending is <b>${Math.abs(p)}% ${p>0?"higher":"lower"}</b> than the same point last month.`])}
+    let big=null;for(const c in bc){const b=bp[c]||0;if(b>30&&bc[c]>b*1.4){const r=bc[c]/b;if(!big||r>big[1])big=[c,r]}}
+    if(big)out.push(["👀",`<b>${big[0]}</b> is up ${Math.round((big[1]-1)*100)}% vs. last month, worth a look.`]);
+  }
+  const avg=tot/cur.length,odd=cur.filter(e=>e.a>avg*3).sort((a,b)=>b.a-a.a)[0];
+  if(cur.length>=5&&odd)out.push(["🔍",`Unusual: <b>${$2(odd.a)}</b> on ${esc(odd.n||odd.c)} is ${Math.round(odd.a/avg)}× your average purchase.`]);
+  const wd=[0,0,0,0,0,0,0];cur.forEach(e=>wd[new Date(e.d+"T12:00").getDay()]+=e.a);
+  const mx=wd.indexOf(Math.max(...wd));
+  if(cur.length>=6)out.push(["📅",`You spend the most on <b>${["Sundays","Mondays","Tuesdays","Wednesdays","Thursdays","Fridays","Saturdays"][mx]}</b>.`]);
+  return out;
+}
+
+function donut(cur){
+  const bc={};cur.forEach(e=>bc[e.c]=(bc[e.c]||0)+e.a);
+  const tot=sum(cur),R=48,C=2*Math.PI*R;let off=0,s="";
+  if(!tot){$("donut").innerHTML='<div class="empty">No data yet</div>';$("leg").innerHTML="";return}
+  const ent=Object.entries(bc).sort((a,b)=>b[1]-a[1]);
+  ent.forEach(([c,v])=>{const l=v/tot*C;s+=`<circle r="${R}" cx="60" cy="60" fill="none" stroke="${CATS[c]}" stroke-width="18" stroke-dasharray="${l} ${C-l}" stroke-dashoffset="${-off}" transform="rotate(-90 60 60)"/>`;off+=l});
+  $("donut").innerHTML=`<svg viewBox="0 0 120 120" width="140" height="140">${s}<text x="60" y="64" text-anchor="middle" font-size="14" font-weight="700" fill="currentColor">${$$(tot)}</text></svg>`;
+  $("leg").innerHTML=ent.map(([c,v])=>`<span><i class="dot" style="background:${CATS[c]}"></i>${c} ${$$(v)} · ${Math.round(v/tot*100)}%</span>`).join("");
+}
+
+function bars(){
+  const ms=[];for(let i=5;i>=0;i--){const d=new Date(now.getFullYear(),now.getMonth()-i,1);ms.push([mk(d.getFullYear(),d.getMonth()),d.toLocaleString(undefined,{month:"short"})])}
+  const v=ms.map(m=>sum(inM(m[0]))),mx=Math.max(...v,1);
+  let s="";v.forEach((x,i)=>{const h=x/mx*100,X=i*50+10;
+    s+=`<rect x="${X}" y="${115-h}" width="30" height="${h}" rx="4" fill="${i==5?"var(--ac)":"var(--bd)"}"/><text x="${X+15}" y="${110-h}" text-anchor="middle" font-size="9" fill="currentColor">${x?$$(x):""}</text><text x="${X+15}" y="130" text-anchor="middle" font-size="10" fill="var(--mu)">${ms[i][1]}</text>`});
+  $("bars").innerHTML=`<svg viewBox="0 0 310 136" width="100%">${s}</svg>`;
+}
+
+function render(){
+  const cur=inM(curM),tot=sum(cur),b=S.budget||0;
+  $("spent").textContent=$$(tot);$("budget").value=b;
+  const left=b-tot;$("left").textContent=$$(left);$("left").style.color=left<0?"var(--bad)":"var(--ok)";
+  const p=b?Math.min(100,tot/b*100):0;$("pb").style.width=p+"%";$("pb").style.background=p>=100?"var(--bad)":p>80?"#f59e0b":"var(--ok)";
+  $("pt").textContent=b?Math.round(tot/b*100)+"% of budget used":"Set a budget to track progress";
+  $("ins").innerHTML=insights().map(i=>`<div class="ins"><span class="ic">${i[0]}</span><span>${i[1]}</span></div>`).join("");
+  donut(cur);bars();
+  const l=[...S.ex].sort((a,b)=>b.d.localeCompare(a.d)||b.id-a.id).slice(0,25);
+  $("list").innerHTML=l.length?l.map(e=>`<div class="row"><i class="dot" style="background:${CATS[e.c]}"></i><div class="grow"><div class="nm">${esc(e.n||e.c)}</div><div class="dt">${e.c} · ${e.d}</div></div><b>${$2(e.a)}</b><button class="x" data-id="${e.id}" aria-label="Delete">×</button></div>`).join(""):'<div class="empty">No expenses yet. Add one above!</div>';
+}
+
+$("f").onsubmit=e=>{e.preventDefault();const a=parseFloat($("amt").value);if(!(a>0))return;
+  S.ex.push({id:Date.now()+Math.random(),a,c:$("cat").value,n:$("note").value.trim(),d:$("date").value});
+  $("amt").value="";$("note").value="";save();render()};
+$("list").onclick=e=>{const id=e.target.dataset.id;if(id){S.ex=S.ex.filter(x=>String(x.id)!==id);save();render()}};
+$("budget").onchange=e=>{S.budget=Math.max(0,parseFloat(e.target.value)||0);save();render()};
+$("clr").onclick=()=>{if(confirm("Delete all expenses?")){S.ex=[];save();render()}};
+$("demo").onclick=()=>{
+  const items={Food:["Groceries","Lunch","Coffee","Dinner out"],Transport:["Gas","Uber","Metro pass"],Housing:["Rent"],Shopping:["Clothes","Amazon order"],Bills:["Phone","Internet","Electricity"],Health:["Pharmacy","Gym"],Fun:["Movies","Concert","Games"],Other:["Gift"]};
+  const rng=[28,6,12,25,14,10,16,12];let i=0;
+  for(let d=0;d<95;d++){const dt=new Date(now.getFullYear(),now.getMonth(),now.getDate()-d);
+    const n=Math.random()<.6?1+Math.floor(Math.random()*2):0;
+    for(let k=0;k<n;k++){const cs=Object.keys(items),c=cs[Math.floor(Math.random()*cs.length)];if(c=="Housing")continue;
+      const nm=items[c][Math.floor(Math.random()*items[c].length)];
+      S.ex.push({id:Date.now()+i++,a:+(rng[cs.indexOf(c)]*(.5+Math.random()*1.3)).toFixed(2),c,n:nm,d:iso(dt)})}
+    if(dt.getDate()==1)S.ex.push({id:Date.now()+i++,a:850,c:"Housing",n:"Rent",d:iso(dt)})}
+  S.ex.push({id:Date.now()+i++,a:420,c:"Shopping",n:"New laptop bag & accessories",d:today});
+  S.budget=S.budget||1500;save();render()};
+render();
+</script></body></html>
